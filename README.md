@@ -4,7 +4,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Cisco%20Packet%20Tracer-blue)
 
 ## 📖 Project Overview
-This project implements a fully segmented **Small Office/Home Office (SOHO)** network using Cisco Packet Tracer. The design includes **three VLANs**, **Router-On-A-Stick (ROAS)** for inter-VLAN routing, and centralized **DHCP services** provisioned through the router. The repository includes complete documentation and topology diagrams suitable for training and demonstration.
+This project implements a segmented SOHO network with **three VLANs**, supporting inter-VLAN routing via **router-on-a-stick (ROAS)** and an alternative Layer 3 design using **SVIs** on a multilayer switch. Centralized **DHCP services** provide per-VLAN address allocation, while **HSRP** is configured to ensure gateway redundancy. Network security is enhanced by disabling unused features (VTP, DTP) and assigning an unused native VLAN. The project includes complete documentation and professional topology diagrams.
 
 **Key Objectives:**
 
@@ -86,14 +86,15 @@ SW1(config-if-range)# sw ac vlan 20
 ```
 
 *Use 'show vlan brief' ('do show' - interface config mode)*
-![Diagram](./img/L1-3.png)
+
+![Diagram](./img/L2-3.png)
 
 
 **4. Configure IPs on PCs to match their subnets (Static Configuration) and use 'ping' in command prompt another host on the same VLAN to test connectivity.**
 
 *Note: 192.168.xx.1 will be reserve for default gateway IPs*
 
-![Diagram](./img/L1-4.png)
+![Diagram](./img/L2-4.png)
 
 **5. Configure trunk port on both switch and on the SW2, set the interface connecting to the router to be a trunk port.**
 ```cisco
@@ -105,7 +106,7 @@ SW2(config-if)# swtichport mode trunk
 ```
 *Use 'show interfaces trunk' ('do show' - interface config mode) and ping vlan20 on another switch to test connectivity*
 
-![Diagram](./img/L1-5.png)
+![Diagram](./img/L2-5.png)
 
 **6. Configure subinterfaces on the Gateway Router to allow communication between isolated VLANs.**
 
