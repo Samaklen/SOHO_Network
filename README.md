@@ -10,6 +10,7 @@ This project implements a fully segmented **Small Office/Home Office (SOHO)** ne
 
 * Reduce broadcast congestion through VLAN segmentation.
 * Demonstrate proficiency in Layer 2 switching and Layer 3 routing concepts.
+* Implement HSRP and DHCP (with DHCP Relay Agent)
 
 ## 🏗️ Network Topology
 ![Network Topology Diagram](./topology.png)
@@ -33,7 +34,7 @@ The network is divided into three distinct VLANs to enforce logical separation:
     * Static Routing
 * **Services:** DHCP (Dynamic Host Configuration Protocol) with excluded addresses (Default gateway address in each VLAN)
 
-## ⚙️ Configuration Highlights
+## ⚙️ Configuration Highlights (*L3 version is below the last step of the L2 version)
 Below are snippets of the core configurations applied to the devices.
 
 ## Router-on-a-Stick (Inter-VLAN Routing) for Layer 2 Switch
@@ -85,14 +86,14 @@ SW1(config-if-range)# sw ac vlan 20
 ```
 
 *Use 'show vlan brief' ('do show' - interface config mode)*
-![Diagram](./img/show_vlan.png)
+![Diagram](./img/L1-3.png)
 
 
 **4. Configure IPs on PCs to match their subnets (Static Configuration) and use 'ping' in command prompt another host on the same VLAN to test connectivity.**
 
 *Note: 192.168.xx.1 will be reserve for default gateway IPs*
 
-![Diagram](./img/ping.png)
+![Diagram](./img/L1-4.png)
 
 **5. Configure trunk port on both switch and on the SW2, set the interface connecting to the router to be a trunk port.**
 ```cisco
@@ -104,7 +105,7 @@ SW2(config-if)# swtichport mode trunk
 ```
 *Use 'show interfaces trunk' ('do show' - interface config mode) and ping vlan20 on another switch to test connectivity*
 
-![Diagram](./img/show_trunk.png)
+![Diagram](./img/L1-5.png)
 
 **6. Configure subinterfaces on the Gateway Router to allow communication between isolated VLANs.**
 
@@ -141,9 +142,9 @@ R1(config-if)# ip address 192.168.30.1 255.255.255.0
 
 **2. When configuring trunk ports on the switches, if trunk encapsulation is not configured, it will reject the command**
 ```cisco
-SW1(config)# interface FastEthernet0/24
-SW1(config-if)# switchport trunk encapsulation dot1q
-SW1(config-if)# mode trunk
+MSW1(config)# interface FastEthernet0/24
+MSW1(config-if)# switchport trunk encapsulation dot1q
+MSW1(config-if)# mode trunk
 ```
 
 
@@ -155,57 +156,186 @@ SW1(config-if)# mode trunk
 
 **4. Use 'ip routing' to enable layer 3 routing on both switches**
 
-*CRITICAL COMMAND: Without this, the switch won't route packets between VLANs!!!*
+**CRITICAL COMMAND: Without this, the switch won't route packets between VLANs!!!**
 ```cisco
-SW1(config)# ip routing
+MSW1(config)# ip routing
 ```
 
-**5. Create the SVIs (Switch Virtual Interfaces) on both**
+**5. Create the SVIs (Switch Virtual Interfaces) on both switches**
 ```cisco
 ! Create the SVI for VLAN 10 (Layer 3)
-SW1(config)# interface vlan 10
-SW1(config-if)# description Gateway for HR
-SW1(config-if)# ip address 192.168.10.1 255.255.255.0
-SW1(config-if)# no shutdown
-SW1(config-if)# exit
+MSW1(config)# interface vlan 10
+MSW1(config-if)# description Gateway for HR
+MSW1(config-if)# ip address 192.168.10.1 255.255.255.0
+MSW1(config-if)# no shutdown
+MSW1(config-if)# exit
 
 ! Create the SVI for VLAN 20
-SW1(config)# interface vlan 20
-SW1(config-if)# description Gateway for Sales
-SW1(config-if)# ip address 192.168.20.1 255.255.255.0
-SW1(config-if)# no shutdown
+MSW1(config)# interface vlan 20
+MSW1(config-if)# description Gateway for Sales
+MSW1(config-if)# ip address 192.168.20.1 255.255.255.0
+MSW1(config-if)# no shutdown
 
 ! Create the SVI for VLAN 30
-SW1(config)# interface vlan 30
-SW1(config-if)# description Gateway for IT
-SW1(config-if)# ip address 192.168.30.1 255.255.255.0
-SW1(config-if)# no shutdown
+MSW1(config)# interface vlan 30
+MSW1(config-if)# description Gateway for IT
+MSW1(config-if)# ip address 192.168.30.1 255.255.255.0
+MSW1(config-if)# no shutdown
 ```
-*Use 'show interfaces trunk' ('do show' - interface config mode) and ping vlan20 on another switch to test connectivity*
+*Use 'show ip int b' ('do show' - interface config mode) and ping host on VLAN 20 with PC in VLAN 10
 
-![Diagram](./img/show_trunk.png)
+![Diagram](./img/L3-5.png)
 
-**6. Configure subinterfaces on the Gateway Router to allow communication between isolated VLANs.**
+**Why packets were lost????**
+
+Configuring identical IP addresses for SVIs on both switches causes conflicts. While the simplest fix is to **delete one SVI**, the better solution is to implement **HSRP (Hot Standby Router Protocol).** This method resolves the conflict while simultaneously increasing redundancy.
+
+
+**6. Change IPs on PCs to avoid conflicts and on MSW1 (No Router) - The BACKUP:**
+
+![Diagram](./img/L3-6.png)
 
 ```cisco
-no shutdown 
-!
-interface GigabitEthernet0/0.10
- description Gateway for HR VLAN
- encapsulation dot1Q 10
- ip address 192.168.10.1 255.255.255.0
-!
-interface GigabitEthernet0/0.20
- description Gateway for Sales VLAN
- encapsulation dot1Q 20
- ip address 192.168.20.1 255.255.255.0
-!
-interface GigabitEthernet0/0.30
- description Gateway for IT VLAN
- encapsulation dot1Q 30
- ip address 192.168.30.1 255.255.255.0
-```
-**7. Configure the appropiate default gateway on each PC and ping test.**
+MSW1(config)# interface vlan 10
+MSW1(config-if)# ip address 192.168.10.2 255.255.255.0  
+MSW1(config-if)# standby 1 ip 192.168.10.1 
+Switch_1(config-if)# standby 1 priority 100  <-- Default priority
 
-*Note: ping may be failed for the first time due to ARP*
-![Diagram](./img/L2-7.png)
+MSW1(config)# interface vlan 20
+MSW1(config-if)# ip address 192.168.20.2 255.255.255.0 
+MSW1(config-if)# standby 1 ip 192.168.20.1 
+
+MSW1(config)# interface vlan 30
+MSW1(config-if)# ip address 192.168.30.2 255.255.255.0 
+MSW1(config-if)# standby 1 ip 192.168.30.1 
+```
+
+**7. On MSW2 (Connected to Router) - The ACTIVE: and ping to check**
+```cisco
+MSW2(config)# interface vlan 10
+MSW2(config-if)# ip address 192.168.10.3 255.255.255.0  
+MSW2(config-if)# standby 1 ip 192.168.10.1 
+MSW2(config-if)# standby 1 priority 110  <-- HIGHER priority makes it Active
+MSW2(config-if)# standby 1 preempt
+
+MSW2(config)# interface vlan 20
+MSW2(config-if)# ip address 192.168.20.3 255.255.255.0  
+MSW2(config-if)# standby 1 ip 192.168.20.1 
+MSW2(config-if)# standby 1 priority 110  <-- HIGHER priority makes it Active
+MSW2(config-if)# standby 1 preempt
+
+MSW2(config)# interface vlan 30
+MSW2(config-if)# ip address 192.168.30.3 255.255.255.0  
+MSW2(config-if)# standby 1 ip 192.168.30.1 
+MSW2(config-if)# standby 1 priority 110  <-- HIGHER priority makes it Active
+MSW2(config-if)# standby 1 preempt
+```
+
+
+**8. On MSW2, Configure the Uplink to the Router (Routed Port)**
+```cisco
+MSW2(config)# interface GigabitEthernet0/1
+MSW2(config-if)# no switchport       <-- Turns the port from L2 to L3
+MSW2(config-if)# ip address 10.0.0.2 255.255.255.252
+MSW2(config-if)# no shutdown
+```
+
+
+**9. On R1, Delete subinterfaces and configure the IP**
+```cisco
+R1(config)# interface GigabitEthernet0/0 
+R1(config-if)# no interface GigabitEthernet0/0.10
+R1(config-if)# no interface GigabitEthernet0/0.20
+R1(config-if)# no interface GigabitEthernet0/0.30
+
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# ip address 10.0.0.1 255.255.255.252
+R1(config-if)# no shutdown
+```
+
+
+**10. Configure default route on MSW1 and MSW2**
+```cisco
+!MSW1 - Send all internet traffic to Switch 2's physical IP
+MSW1(config)# ip route 0.0.0.0 0.0.0.0 192.168.10.3
+
+!MSW2 - Send all internet traffic to the Router's IP"
+MSW2(config)# ip route 0.0.0.0 0.0.0.0 10.0.0.1
+```
+![Diagram](./img/L3-10.png)
+
+
+**11. Configure routes on R1 to each subnet**
+```cisco
+R1(config)# ip route 192.168.10.0 255.255.255.0 10.0.0.2
+R1(config)# ip route 192.168.20.0 255.255.255.0 10.0.0.2
+R1(config)# ip route 192.168.30.0 255.255.255.0 10.0.0.2
+```
+
+![Diagram](./img/L3-11.png)
+
+
+**12. Now DHCP, exclude SW1 and MSW2 IPs from DHCP**
+```cisco
+R1(config)# ip dhcp excluded-address 192.168.10.1 192.168.10.3
+R1(config)# ip dhcp excluded-address 192.168.20.1 192.168.20.3
+R1(config)# ip dhcp excluded-address 192.168.30.1 192.168.30.3
+```
+
+**12. Create pools for each department**
+```cisco
+R1(config)# ip dhcp pool HR
+R1(dhcp-config)# network 192.168.10.0 255.255.255.0
+R1(dhcp-config)# default-router 192.168.10.1  <-- MUST be the Virtual IP
+R1(dhcp-config)# dns-server 8.8.8.8
+
+R1(config)# ip dhcp pool Sales
+R1(dhcp-config)# network 192.168.20.0 255.255.255.0
+R1(dhcp-config)# default-router 192.168.20.1  <-- MUST be the Virtual IP
+R1(dhcp-config)# dns-server 8.8.8.8
+
+R1(config)# ip dhcp pool IT
+R1(dhcp-config)# network 192.168.30.0 255.255.255.0
+R1(dhcp-config)# default-router 192.168.30.1  <-- MUST be the Virtual IP
+R1(dhcp-config)# dns-server 8.8.8.8
+```
+
+![Diagram](./img/L3-12.png)
+
+**13. VERY IMPORTANT!!! on MSW2, configure it to be DHCP Relay Agent of R1**
+
+if this step is neglected, R1 **cannot** give IPs to end hosts because DHCP relies on broadcasts and by definition, broadcasts cannot cross a router.
+
+```cisco
+MSW2(config)# interface vlan 10
+MSW2(config-if)# ip helper-address 10.0.0.1
+
+MSW2(config)# interface vlan 20
+MSW2(config-if)# ip helper-address 10.0.0.1
+
+MSW2(config)# interface vlan 30
+MSW2(config-if)# ip helper-address 10.0.0.1
+```
+
+Now end hosts should be able to get IPs from R1 via DHCP
+
+![Diagram](./img/L3-13.png)
+
+
+**BONUS - For security purposes, you can disable unused features (VTP, DTP) and change the native VLAN to be an unused VLAN**
+
+```cisco
+!for trunk ports (configuring an interface to be an access port also disable DTP)
+
+MSW1(config-if)# switchport nonegotiate
+MSW1(config-if)#switchport trunk native vlan 3333
+MSW2(config-if)# switchport nonegotiate
+MSW2(config-if)#switchport trunk native vlan 3333
+
+!change VTP mode to transparent and VTP domain name to an unused one (default = 'cisco')
+MSW1(config)# vtp mode transparent
+MSW1(config-if)# vtp domain msw1
+
+MSW2(config)# interface vlan 30
+MSW2(config-if)# vtp domain msw2
+```
