@@ -13,7 +13,14 @@ This project implements a segmented SOHO network with **three VLANs**, supportin
 * Implement HSRP and DHCP (with DHCP Relay Agent)
 
 ## 🏗️ Network Topology
-![Network Topology Diagram](./topology.png)
+
+* ## Router-on-a-Stick (Inter-VLAN Routing) for Layer 2 Switch
+ 
+  ![Network Topology Diagram](./img/topology-L2.png)
+
+* ## SVIs (Switch Virtual Interfaces) for Layer 3 Switch
+ 
+  ![Network Topology Diagram](./img/topology-L3.png)
 
 ### Design Specifications
 The network is divided into three distinct VLANs to enforce logical separation:
